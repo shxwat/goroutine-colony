@@ -1,61 +1,128 @@
+<div align="center">
+
 # Goroutine Colony
 
 **What if the Go runtime was alive?**
 
-Goroutine Colony turns Go concurrency into a living world. Every goroutine is a small procedural creature. Channels are glass conduits with physical buffer slots, mutexes are caged chambers with gates, and shared memory floats as cells you can watch being read and written. Blocking, contention, races and deadlocks are shown as behaviour, not as text.
+Go concurrency, shown as a living colony of creatures you can watch.
 
-It runs two ways:
+[**▶ Open the live demo**](https://goroutine-colony.vercel.app) · [How to read it](#how-to-read-the-colony) · [The five stories](#the-five-stories) · [Real backend mode](#real-backend-mode-seatrush) · [Run locally](#run-it-locally)
 
-- **Scenarios:** five small Go programs executed by a deterministic in-browser runtime.
-- **Live:** a real Go backend streams instrumentation events over WebSocket, and its real HTTP requests appear as creatures.
+[![Live demo](https://img.shields.io/badge/demo-goroutine--colony.vercel.app-00ADD8?style=flat-square)](https://goroutine-colony.vercel.app)
+[![License: MIT](https://img.shields.io/badge/license-MIT-ffcf7a?style=flat-square)](LICENSE)
+![Built with Three.js](https://img.shields.io/badge/three.js-react--three--fiber-1b2630?style=flat-square)
 
-![Buffered channel: the buffer is full and two senders are blocked at the port](docs/buffer.jpg)
+<img src="docs/buffer.webp" alt="A buffered channel fills up, two goroutines get stuck in red at the entrance, then the consumer wakes up and frees a slot" width="900" />
+
+<sub>A channel with 3 slots fills up. The 4th and 5th senders turn red and wait at the entrance. The sleeping consumer wakes, takes a value, and one stuck sender gets in.</sub>
+
+</div>
 
 ---
 
-## Scenarios
+## What is this?
 
-| | What you see |
+Programs written in **Go** do many things at once using **goroutines**. The trouble is that you can't *see* any of it. Whether a goroutine is working, stuck, or waiting on another happens invisibly inside the runtime, and that is where the hardest bugs live.
+
+**Goroutine Colony makes it visible.** Every goroutine becomes a small creature. Channels, locks and shared memory become physical structures in a world. When a goroutine gets stuck, you see it get stuck. When two of them corrupt the same data, the world glitches. When the whole program deadlocks, everything freezes.
+
+You don't need to read any code to follow it. The motion tells the story.
+
+---
+
+## New to Go? The 30-second version
+
+| Idea | In plain words |
 |---|---|
-| **CHANNEL** | An unbuffered send. The sender waits at the entrance holding its value until a receiver arrives, then the value crosses in one hand-off. |
-| **BUFFER** | `make(chan Job, 3)`. Three cradles fill, the conduit runs hot, and the fourth and fifth senders jam red at the port until the consumer frees a slot. |
-| **MUTEX** | One goroutine inside the chamber, the gate closed behind it. Everyone else queues outside, pressing against the bars. |
-| **RACE** | `counter++` from two goroutines with no lock. Their read-modify-write windows overlap, the cell tears into colour ghosts, and the value settles on the wrong number. |
-| **DEADLOCK** | Two goroutines each hold one lock and wait for the other. Their ownership and wait lines close into a loop, the colony freezes, and then the runtime prints its verdict. |
-
-![Deadlock: two goroutines each holding one mutex and waiting on the other](docs/deadlock.jpg)
-
-![Data race: two unsynchronized writes to the same counter](docs/race.jpg)
-
-Nothing in the scenarios is hand-timed. Each one is a Go-like program written as generator coroutines (`yield go.send('jobs', job)`), and a small virtual scheduler with real channel, mutex and WaitGroup semantics decides when each goroutine runs. Blocking, wake-ups, race detection (lost updates) and deadlock detection ("all goroutines are asleep") come out of those rules.
-
-The code panel pins every goroutine to the line it is executing, and the trace panel shows the event stream as it happens.
+| **Goroutine** | A small independent task. A Go program can run thousands at the same time. |
+| **Channel** | A pipe for handing values from one goroutine to another. |
+| **Unbuffered channel** | A handshake: the sender waits until someone is there to take the value. |
+| **Buffered channel** | A pipe with a small waiting room (say, 3 slots). Senders only wait when it's full. |
+| **Mutex (lock)** | A door that lets one goroutine in at a time. Everyone else queues outside. |
+| **Data race** | Two goroutines change the same data at the same moment without a lock. One change gets lost. |
+| **Deadlock** | Everyone is waiting for someone else. Nothing can ever move again. |
 
 ---
 
-## Live mode: a real Go backend
+## How to read the colony
 
-![SeatRush live: 50 real HTTP requests competing for one seat](docs/seatrush-live.jpg)
+| You see | It means |
+|---|---|
+| 🐜 A small creature | A goroutine. The **big** one near the core is `main`. |
+| Its glowing stripe in **cyan** | Running: doing work. |
+| In **red**, pressing forward | **Blocked**: it wants to continue but can't, e.g. the channel is full or the lock is taken. |
+| In **amber** | Waiting for something to arrive. |
+| In **violet**, low to the ground | Sleeping (`time.Sleep`). |
+| Dissolving into dust | The goroutine finished. |
+| 💎 A gold diamond on its back | A value being passed around (a "job"). |
+| 🧪 A glass tube | A **channel**. Glowing rings on it are buffer slots. A red tube is jammed. |
+| 🔒 A round cage with a padlock | A **mutex**. Raised gate bars mean locked. Red means others are queuing. |
+| ▢ A floating cube with a number | **Shared memory**, like a counter. |
+| 🌀 The spinning tower at the back | The Go runtime. New goroutines hatch from it. |
+| A ring wave on the floor | Something just happened: a send, a lock, a write. |
 
-Point the colony at any process that streams Colony events:
+The **code panel** (bottom left) shows the Go program, with a chip for each goroutine on the line it's currently running. The **trace** (bottom right) is the live event stream.
+
+---
+
+## The five stories
+
+Pick them from the bar at the bottom of the demo, or press `1`–`5`.
+
+### 1 · CHANNEL: a handshake
+A producer brings a job to an **unbuffered** channel, but nobody is there to receive it, so it **waits at the entrance, red**, holding the job. When the consumer arrives at the other end, the job shoots through the tube in one hand-off and both carry on.
+> **Lesson:** on an unbuffered channel, a send and a receive must meet.
+
+### 2 · BUFFER: the waiting room fills up
+`make(chan Job, 3)`. Five producers each drop a job into a channel with three slots. The slots fill, **the tube turns hot red**, and the last two producers get stuck outside. The consumer is still asleep. When it wakes and takes a job, one slot frees and a stuck producer immediately gets in.
+> **Lesson:** a buffer absorbs bursts, but once it's full, senders block.
+
+### 3 · MUTEX: one at a time
+Five goroutines each want to add 100 to a shared `balance`. Only one is allowed **inside the cage**; the rest **queue at the gate, red**. Each one inside reads the balance, writes the new value, unlocks, and the next one enters. The final balance is exactly 500.
+> **Lesson:** a lock makes goroutines take turns, and that waiting is the cost of correctness.
+
+### 4 · RACE: a lost update
+Two goroutines each run `counter++` three times, with **no lock**. `counter++` is really three steps: read, add one, write. When both read the same value before either writes, one increment disappears. At that moment the memory cell **tears apart**, the screen glitches, and **DATA RACE** appears. The counter ends at 4 instead of 6.
+
+<img src="docs/race.jpg" alt="Data race: two conflicting writes to the same counter" width="800" />
+
+> **Lesson:** without synchronization, the result depends on timing, and timing lies.
+
+### 5 · DEADLOCK: everyone waits forever
+Two goroutines each grab one lock (`muA`, `muB`), then each tries to grab the other's. Their ownership lines and waiting lines cross into a **closed loop**. The other workers finish one by one, the colony **goes quiet and freezes**, and then Go's real error message types out:
+`fatal error: all goroutines are asleep - deadlock!`
+
+<img src="docs/deadlock.jpg" alt="Deadlock: two goroutines each holding one mutex and waiting on the other" width="800" />
+
+> **Lesson:** take locks in a consistent order, or this is what happens.
+
+Nothing in these stories is pre-animated. Each scenario is a small Go-style program running on a tiny scheduler with real channel, mutex and WaitGroup rules, so blocking, the race and the deadlock all emerge on their own.
+
+---
+
+## Real backend mode: SeatRush
+
+<img src="docs/seatrush-live.jpg" alt="50 real HTTP requests crowding the lock of a Go booking API to reserve one seat" width="900" />
+
+The colony can also watch a **real Go program** while it runs.
+
+In this demo, **SeatRush** (a Go ticket-booking API) gets **50 real HTTP requests at the same instant, all trying to book the same seat**. Each request becomes a creature. They crowd the gate of SeatRush's actual lock. One gets in, sees the seat is `AVAILABLE`, marks it `HELD`, and walks home with a gold **201 RESERVED**. The other 49 get in one at a time, find the seat taken, and peel away with **409**.
+
+- **The results are real.** The success and conflict counts are SeatRush's actual HTTP responses; the animation never decides who wins.
+- **It's slowed down, not rearranged.** Real requests finish in about a millisecond, so the colony replays them in slow motion, keeping the exact order they happened in.
+- **There's a broken mode for comparison.** With `SEATRUSH_DEMO_UNSAFE=true`, SeatRush checks the seat and claims it in two separate steps. All 50 buyers "win" the same seat, and the colony flags a **DOUBLE BOOKING**.
+
+### Connect your own Go program
+
+Open the colony with a WebSocket address:
 
 ```
-http://localhost:5173/?ws=ws://localhost:7070/colony
+https://goroutine-colony.vercel.app/?ws=ws://localhost:7070/colony
 ```
 
-The first producer is **SeatRush**, a Go ticket-booking API. Fifty concurrent `POST /reservations` requests for the same seat hatch as fifty creatures and crowd the gate of SeatRush's real `sync.Mutex`. One gets in, reads the seat as `AVAILABLE`, flips it to `HELD`, and walks home with its reservation under a gold **201**. The other forty-nine read `HELD` and peel away with **409**.
+> Browsers restrict a public `https` page from reaching `localhost`. Chrome asks for local-network permission; other browsers may refuse. The simplest route is to run the colony locally (`npm run dev`) and open `http://localhost:5173/?ws=ws://localhost:7070/colony`.
 
-The counts on screen are SeatRush's actual HTTP status codes. Nothing in the animation decides the result; the backend is the source of truth.
-
-How it works:
-
-- **Correlation.** Each HTTP request gets a correlation ID (`req-N`, returned in `X-Request-ID`) that maps to one goroutine and one creature for its whole lifecycle.
-- **Slow motion in true order.** Real requests finish in about a millisecond, so the colony replays the stream in slow motion. It preserves every happens-before relation: per goroutine, per mutex and per memory cell. The only thing it adds is walking motion, never outcomes or ordering.
-- **Not tied to SeatRush.** The frontend knows nothing about SeatRush. It speaks a generic concurrency protocol, and the producer describes itself with a `STREAM_INFO` event.
-
-### Streaming from your own Go program
-
-Send JSON events (one object, or an array per message) over a WebSocket:
+Then stream JSON events like these from your program, one object or an array per message:
 
 ```jsonc
 {"type":"RUN_START","t":0,"program":"myapp"}
@@ -71,58 +138,60 @@ Send JSON events (one object, or an array per message) over a WebSocket:
 {"type":"GOROUTINE_DONE","t":0.003,"gid":18,"outcome":"success","status":"201 RESERVED"}
 ```
 
-Layouts are optional: resources without positions are placed automatically. The full protocol is typed in [`src/simulation/events.ts`](src/simulation/events.ts).
+Positions are optional; the colony lays things out itself. Every event type is defined in [`src/simulation/events.ts`](src/simulation/events.ts).
 
 ---
 
-## Architecture
-
-```
-Scenario program ──► VirtualRuntime ─┐
-                                     ├─► ColonyEvent stream ─► World.apply() ─► renderer (read-only, per frame)
-Go app ─► WebSocket ─► LiveDirector ─┘                       └─► EventBus ─► FX · camera · sound · UI (throttled)
-```
-
-- **`src/simulation/`**: the protocol (`events.ts`), the world model (`world.ts`, the only place state changes), the shared spatial layout, the virtual scheduler, the WebSocket source with reconnect, and the live director.
-- **`src/scenarios/`**: the five programs and their Go source.
-- **`src/entities/`**: the creature. A pure-TypeScript hexapod with tripod gait and two-bone IK legs.
-- **`src/scene/`**: React Three Fiber rendering. Instanced bodies, legs and payloads; shader conduits; mutex chambers; memory cells; the floor; the runtime core; the camera director; post-processing.
-- **`src/ui/`, `src/store/`**: the DOM overlay and a zustand store, fed by the event stream at most once per frame.
-- **`src/audio/`**: procedural WebAudio. No audio files; starts muted.
-
-Per-frame motion never goes through React. Creatures, legs, payloads and links are instanced, and the renderer adapts its pixel ratio to hold the frame rate. On an M-series MacBook it runs at a steady 120 fps.
-
----
-
-## Run it
+## Run it locally
 
 ```bash
+git clone https://github.com/shxwat/goroutine-colony.git
+cd goroutine-colony
 npm install
-npm run dev          # http://localhost:5173
+npm run dev        # → http://localhost:5173
 ```
 
-```bash
-npm run build && npm run preview   # production build
-```
+Production build: `npm run build && npm run preview`
 
-Deep links: `/?scenario=channel|buffer|mutex|race|deadlock`, or `/?ws=ws://host:port/path` for live mode.
+Link straight to a story with `?scenario=channel`, `buffer`, `mutex`, `race` or `deadlock`.
 
 ### Controls
 
-| | |
+| Key / action | Does |
 |---|---|
-| `1`–`5` | switch scenario |
-| `Space` | pause |
-| `R` | replay |
-| `M` | sound on/off |
-| drag / scroll | orbit / zoom (the camera returns on replay) |
-| click a goroutine | follow it (`Esc` to stop) |
-| hover | inspect a goroutine, channel, mutex or memory cell |
+| `1` – `5` | Switch scenario |
+| `Space` | Pause / resume |
+| `R` | Replay |
+| `M` | Sound on / off (starts muted) |
+| Drag · Scroll | Orbit · Zoom |
+| Click a creature | Follow that goroutine (`Esc` to stop) |
+| Hover anything | See its details: state, what it's waiting on, buffer fill, lock owner |
 
 ---
 
-Built with TypeScript, React, Three.js / React Three Fiber, zustand and Vite.
+## How it's built
+
+```
+Scenario program ──► virtual scheduler ─┐
+                                        ├─► event stream ─► world state ─► 3D renderer
+Real Go app ──► WebSocket ──► director ─┘                └─► effects · camera · sound · UI
+```
+
+The 3D world never runs the logic. It only reacts to a stream of events (`GOROUTINE_SPAWN`, `MUTEX_WAIT`, `MEMORY_WRITE`, …). The same renderer works for the built-in scenarios and for a live Go backend.
+
+| Folder | What's inside |
+|---|---|
+| [`src/simulation/`](src/simulation) | The event protocol, the world state, the mini Go scheduler, the live WebSocket source and slow-motion director. |
+| [`src/scenarios/`](src/scenarios) | The five stories, written as Go-style programs, plus the Go source shown on screen. |
+| [`src/entities/`](src/entities) | The creature: a six-legged walker with procedural gait and leg IK. |
+| [`src/scene/`](src/scene) | Everything 3D: creatures, channels, cages, memory cells, the runtime core, the camera director, effects. |
+| [`src/ui/`](src/ui), [`src/store/`](src/store) | The overlay: stats, code panel, trace, tooltips, verdicts. |
+| [`src/audio/`](src/audio) | Sound, generated in code with Web Audio. No audio files. |
+
+Built with **TypeScript, React, Three.js (React Three Fiber), zustand and Vite**. Creatures, legs and effects are drawn with GPU instancing, and per-frame motion never goes through React. It holds a steady 120 fps on an M-series MacBook and lowers its resolution automatically on weaker machines instead of stuttering.
+
+---
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © shxwat
