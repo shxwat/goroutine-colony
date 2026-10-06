@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "description": "The Go runtime, alive. Goroutines, channels, mutexes, races and deadlocks as a living 3D colony.",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",

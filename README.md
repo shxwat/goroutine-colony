@@ -122,3 +122,7 @@ Deep links: `/?scenario=channel|buffer|mutex|race|deadlock`, or `/?ws=ws://host:
 ---
 
 Built with TypeScript, React, Three.js / React Three Fiber, zustand and Vite.
+
+## License
+
+[MIT](LICENSE)
