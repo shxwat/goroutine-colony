@@ -6,7 +6,7 @@
 
 Go concurrency, shown as a living colony of creatures you can watch.
 
-[**▶ Open the live demo**](https://goroutine-colony.vercel.app) · [How to read it](#how-to-read-the-colony) · [The five stories](#the-five-stories) · [Real backend mode](#real-backend-mode-seatrush) · [Run locally](#run-it-locally)
+[**▶ Open the live demo**](https://goroutine-colony.vercel.app) · [How to read it](#how-to-read-the-colony) · [The five stories](#the-five-stories) · [Live event mode](#live-event-mode) · [Run locally](#run-it-locally)
 
 [![Live demo](https://img.shields.io/badge/demo-goroutine--colony.vercel.app-00ADD8?style=flat-square)](https://goroutine-colony.vercel.app)
 [![License: MIT](https://img.shields.io/badge/license-MIT-ffcf7a?style=flat-square)](LICENSE)
@@ -100,19 +100,16 @@ Nothing in these stories is pre-animated. Each scenario is a small Go-style prog
 
 ---
 
-## Real backend mode: SeatRush
+## Live event mode
 
-<img src="docs/seatrush-live.jpg" alt="50 real HTTP requests crowding the lock of a Go booking API to reserve one seat" width="900" />
+The renderer is driven entirely by a typed stream of JSON events, so it is not limited to the built-in scenarios. The browser app includes a WebSocket client: open the colony with a `?ws=` address and it will animate whatever events arrive on that socket. Any backend that emits these events can drive it.
 
-The colony can also watch a **real Go program** while it runs.
+- **The renderer never decides outcomes.** In live mode it only displays the events it receives, including each goroutine's reported result.
+- **Events are slowed down, not rearranged.** Real work often finishes in about a millisecond, so a director replays incoming events in slow motion while keeping their original order.
 
-In this demo, **SeatRush** (a Go ticket-booking API) gets **50 real HTTP requests at the same instant, all trying to book the same seat**. Each request becomes a creature. They crowd the gate of SeatRush's actual lock. One gets in, sees the seat is `AVAILABLE`, marks it `HELD`, and walks home with a gold **201 RESERVED**. The other 49 get in one at a time, find the seat taken, and peel away with **409**.
+> A Go emitter package that instruments a real program and produces these events is not published yet. For now you need to write the emitter side yourself; the protocol below is everything it has to send.
 
-- **The results are real.** The success and conflict counts are SeatRush's actual HTTP responses; the animation never decides who wins.
-- **It's slowed down, not rearranged.** Real requests finish in about a millisecond, so the colony replays them in slow motion, keeping the exact order they happened in.
-- **There's a broken mode for comparison.** With `SEATRUSH_DEMO_UNSAFE=true`, SeatRush checks the seat and claims it in two separate steps. All 50 buyers "win" the same seat, and the colony flags a **DOUBLE BOOKING**.
-
-### Connect your own Go program
+### Connecting an event source
 
 Open the colony with a WebSocket address:
 
@@ -122,7 +119,7 @@ https://goroutine-colony.vercel.app/?ws=ws://localhost:7070/colony
 
 > Browsers restrict a public `https` page from reaching `localhost`. Chrome asks for local-network permission; other browsers may refuse. The simplest route is to run the colony locally (`npm run dev`) and open `http://localhost:5173/?ws=ws://localhost:7070/colony`.
 
-Then stream JSON events like these from your program, one object or an array per message:
+Then stream JSON events like these from your backend, one object or an array per message (this example describes HTTP requests contending for a lock on a seat record):
 
 ```jsonc
 {"type":"RUN_START","t":0,"program":"myapp"}
@@ -174,10 +171,10 @@ Link straight to a story with `?scenario=channel`, `buffer`, `mutex`, `race` or 
 ```
 Scenario program ──► virtual scheduler ─┐
                                         ├─► event stream ─► world state ─► 3D renderer
-Real Go app ──► WebSocket ──► director ─┘                └─► effects · camera · sound · UI
+Event source ──► WebSocket ──► director ─┘                └─► effects · camera · sound · UI
 ```
 
-The 3D world never runs the logic. It only reacts to a stream of events (`GOROUTINE_SPAWN`, `MUTEX_WAIT`, `MEMORY_WRITE`, …). The same renderer works for the built-in scenarios and for a live Go backend.
+The 3D world never runs the logic. It only reacts to a stream of events (`GOROUTINE_SPAWN`, `MUTEX_WAIT`, `MEMORY_WRITE`, …). The same renderer works for the built-in scenarios and for any external source that sends the same events over a WebSocket.
 
 | Folder | What's inside |
 |---|---|
