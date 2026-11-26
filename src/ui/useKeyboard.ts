@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { SCENARIOS } from '../scenarios'
 import { useColony } from '../store/colonyStore'
 
-/** SPACE pause · R replay · M sound · 1–5 scenarios · ←/→ prev/next scenario · ESC stop following. */
+/** Keyboard shortcuts: SPACE pause · R replay · M sound · 1–5 scenarios · ←/→ prev/next scenario · ESC stop following. */
 export function useKeyboard() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
